@@ -1,0 +1,205 @@
+#*******************************************
+# MacDescription = Check and display Owner-Alphabet-Challenge (GC5AJRY)
+# MacFileName = Owner-Alphabet-Challenge.gsk
+# MacAuthor = Lars, P!X3L
+# MacVersion = 1.0
+# MacUrl = 
+#*******************************************
+
+# Version-History
+# v1.0    2014-10-06 initial version
+
+
+#-------------------------------------------------------------------------------
+# Main
+#-------------------------------------------------------------------------------
+  GOSUB Name=DeclareVariables
+  GOSUB Name=InitVariables
+  
+  # get user name and id from GSAK UserInfo table
+  $currentdb = $_CurrentDatabase
+  $database = "$_AppData\gsak.db3"
+  $data = Sqlite("open",$database)
+  $_sql = "SELECT uData FROM UserInfo WHERE uKey='UserName'"
+  $user = Sqlite("sql",$_sql)
+  $_sql = "SELECT uData FROM UserInfo WHERE uKey='UserId'"
+  $userID = Sqlite("sql",$_sql)
+  $data = Sqlite("close",$database)
+  $database = "$_DbPath\$currentdb\sqlite.db3"
+  $data = Sqlite("open",$database)
+  
+  # check if user and userid are set UserInfo,
+  # if not, get user name from GSAK install path
+  if ($user="") or ($userID="")
+    $tempS = $_AppData
+    $tempS = SysInfo("gsakini;TfmConfig;edtDataStore.Text")
+    $tempS2 = "\"
+    $s1 = AT($tempS2,$tempS)
+    $tempS = Substr($tempS,$s1+1,100)
+    $s1 = AT($tempS2,$tempS)
+    $tempS = Substr($tempS,$s1+1,100)
+    $s1 = AT($tempS2,$tempS)
+    $tempS = Substr($tempS,1,$s1-1)
+    $tempS = RegExReplace(" ",$tempS,"_")
+    $tempS = HttpEncode($tempS)
+    if $user=""
+      $user = $tempS
+    endif
+    if $userID=""
+      $userID = $tempS
+    endif
+  endif
+
+  # output html header
+  $out = $out + "<html><head>" + $_CrLf
+  $out = $out + "<META NAME='Author' CONTENT='Lars, P!X3L'>" + $_CrLf
+  $out = $out + "<META HTTP-EQUIV='PRAGMA' CONTENT='no-cache'>" + $_CrLf
+  $out = $out + "<title>Owner-Alphabet-Challenge (GC5AJRY) für $user</title>" + $_CrLf
+  $out = $out + "</head><html><body style='font-family: Verdana, Arial, sans-serif; font-size: 10px; text-align: left;'><center>" + $_CrLf
+  
+  # output table 
+  $out = $out + "<table border='1'><tr><td><table cellpadding='1' style='width: 600px; font-family: Verdana, Arial, sans-serif; font-size: 11px; text-align: left;'>" + $_CrLf
+  $out = $out + "<tr height='35'>" + $_CrLf
+  $out = $out + "<td style='$stTab2cHead2' colspan='6'><b>$user<br> <i>&quot;Owner-Alphabet-Challenge&quot; (<a href='http://coord.info/GC5AJRY' target='_blank'>GC5AJRY</a>)</i></b></td>"
+  $out = $out + "</tr>" + $_CrLf
+
+  # build the table header 
+  $out = $out + "<tr>" + $_CrLf
+  $out = $out + "<td style='$stTab2cHead'>&nbsp;</td>"
+  $out = $out + "<td style='$stTab2cHead'><b>Code</td></b>"
+  $out = $out + "<td style='$stTab2cHead'>&nbsp;</td>"
+  $out = $out + "<td style='$stTab2cHead'><b>Cache Name</b></td>"
+  $out = $out + "<td style='$stTab2cHead'><b>Owner</b></td>"
+  $out = $out + "<td style='$stTab2cHead'><b>Funddatum</td></b>" + $_CrLf
+  $out = $out + "</tr>" + $_CrLf
+
+  # process letters & digits
+  $count = 0
+  WHILE $count < $maximum
+    $count = $count+1
+    $char  = Extract($chars, "," , $count)
+    #msgok msg="maximum count char: $maximum $count $char"
+
+    SHOWSTATUS msg="Suche für $char" Width=350
+    
+    $_sql = "SELECT '"+$char+"' as char, code, cachetype, name, ownername, FoundByMeDate FROM caches WHERE found and (substr(lower(trim(name)),1,1)=lower('"+$char+"')) and (substr(lower(trim(ownername)),1,1)=lower('"+$char+"')) LIMIT 1"
+    $work = Sqlite("sql",$_sql)
+    $LogTotal = $_SqlRows
+
+    IF ($LogTotal > 0)
+      $GetCache = Extract($work,$_CrLf ,1)
+      # extract data
+      $letter = Extract($GetCache,";",1)
+      $cachecode = Extract($GetCache,";",2)
+      $cachetype = Extract($GetCache,";",3)
+      GOSUB Name=GetCacheLogo
+      $TypeImageS = "<img width='16' src='$TypeImage' border='0'>"
+      $cachename = Extract($GetCache,";",4)
+      if len($cachename)>30
+        $cachename = substr($cachename,1,25)+"[...]"
+      endif
+      $ownername = Extract($GetCache,";",5)
+      $LogDate = Extract($GetCache,";",6)
+      if $LogDate<>""
+        $LogDate = DateFormat(SqlToDate($LogDate))
+      endif
+      $matches = $matches + 1
+    ELSE
+      # no cache found for this char -> create empty line
+      $LogDate = ""
+      $cachecode = ""
+      $TypeImageS = ""
+      $ownername = ""
+      $cachename = ""
+    ENDIF
+
+    # output table row
+    $out = $out + "<tr>" + $_CrLf
+    $out = $out + "<td style='$st2c1'>$char</td>"
+    $out = $out + "<td style='$st2c1'><a href='http://coord.info/$cachecode' target='_blank'>$cachecode</a></td>"
+    $out = $out + "<td style='$st2c1'>$TypeImageS</td>"
+    $out = $out + "<td style='$st2c1'>$cachename</td>"
+    $out = $out + "<td style='$st2c1'>$ownername</td>"
+    $out = $out + "<td style='$st2c1'>$LogDate</td>" + $_CrLf  
+    $out = $out + "</tr>" + $_CrLf
+  ENDWHILE # Process chars
+  
+  # output footer
+  $out = $out + "<tr>" + $_CrLf
+  if $matches=$maximum
+    $m = "alle"
+  else
+    $m = "$matches von"
+  endif
+  $out = $out + "<td style='$stTab2cFooter' height='28' colspan='6'><b>$user hat $m $maximum Caches gefunden<br>Datenbank: <i>$currentdb</i> - Stand: $_Today $_Time</b></b></td>"
+  $out = $out + "</tr></table></td></tr></table>" + $_CrLf
+  
+  # output trailer
+  $out = $out+"<a style='text-decoration:none; font-size: xx-small;' href='mailto:gc.pix3l@gmail.com?subject=Owner-Alphabet-Challenge'>"+$_CrLf
+  $out = $out+"Owner-Alphabet-Challenge.gsk v$MacroVersion</a>"+$_CrLf
+  
+  # single table file
+  $out = $out+"</center></body></html>" + $_CrLf
+  
+  # save user html file locally
+  SHOWSTATUS msg="Sichern ." Width=350
+  $out = $out + "</center></body></html>" + $_CrLf
+  $url = $path+"Owner-Alphabet-Challenge.htm"
+  $tmp = PutFile($url,$out)
+
+  # show html file in browser
+  web url="$url"
+
+
+#-------------------------------------------------------------------------------
+BEGINSUB Name=GetCacheLogo
+#-------------------------------------------------------------------------------
+  # some constants
+  $Types = "A,B,C,E,G,L,M,R,T,U,V,W,Z,X,I,Y,1,2,3"
+  $Typenums = "9,5,13,6,27,12,3,137,2,8,4,11,453,2134,1858,waymark,3653,3773,3774"
+  $NumItems = RegExCount(",",$Types )
+  $wpttypes = "http://www.geocaching.com/images/wpttypes/sm/"
+
+  # get image type
+  $index = 0
+  WHILE $index <= $NumItems
+    $index = $index+1
+    $thistype  = Extract($Types, "," , $Index)
+    IF $thistype = $cachetype
+      BEGINCASE
+      CASE $thistype = "Y"
+        $TypeImage = "http://gsak.net/stats/wm16.gif"
+      CASE $thistype = "L"
+        $TypeImage = "http://gsak.net/stats/1216.gif"
+      OTHERWISE
+        $Temp1  = Extract($Typenums, "," , $Index)
+        $TypeImage = $wpttypes+$Temp1+".gif"
+      ENDCASE
+      $index = $NumItems + 1
+    ENDIF
+  ENDWHILE
+ENDSUB
+
+
+#-------------------------------------------------------------------------------
+BEGINSUB Name=DeclareVariables
+#-------------------------------------------------------------------------------
+ENDSUB
+
+
+#-------------------------------------------------------------------------------
+BEGINSUB Name=InitVariables
+#-------------------------------------------------------------------------------
+  #$found = 1
+  $chars = "A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z"
+  $maximum = 26
+  $MacroVersion  = MacHeader("MacVersion")
+  $matches = 0
+  $out = ""
+  $path = "$_Install\Macros\"
+  $stTab2cHead = "background: #B4B4B4;"
+  $stTab2cHead2 = "background: #B4B4B4; font-size: 11px; text-align: center;"
+  $stTab2cFooter = "background: #B4B4B4; font-size: 10px; text-align: center;"
+  $st2c1 = "background: #CCCCCC;"
+  $st2c2 = "background: #BABABA;"
+ENDSUB
